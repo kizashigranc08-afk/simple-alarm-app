@@ -1,45 +1,9 @@
-name: Deploy to GitHub Pages
-
+# このワークフローは無効化済み（GitHub Pages はブランチデプロイを使用）
 on:
-  push:
-    branches: [main]
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-  administration: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  placeholder:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      # GitHub Secrets から config.js を生成（リポジトリには含めない）
-      - name: Generate config.js from secrets
-        run: |
-          cat > config.js << 'ENDOFCONFIG'
-          const SUPABASE_URL = 'SUPABASE_URL_PLACEHOLDER';
-          const SUPABASE_ANON_KEY = 'SUPABASE_ANON_KEY_PLACEHOLDER';
-          ENDOFCONFIG
-          sed -i "s|SUPABASE_URL_PLACEHOLDER|${{ secrets.SUPABASE_URL }}|g" config.js
-          sed -i "s|SUPABASE_ANON_KEY_PLACEHOLDER|${{ secrets.SUPABASE_ANON_KEY }}|g" config.js
-
-      - uses: actions/configure-pages@v4
-        with:
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-
-      - uses: actions/deploy-pages@v4
-        id: deployment
+      - run: echo "disabled"
