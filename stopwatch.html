@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stopwatch</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;600&family=JetBrains+Mono:wght@200;300;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --c: #4c9595;
+      --c2: #7bbcbc;
+      --c3: #2d6464;
+      --bg: #050a0a;
+      --glow: rgba(76,149,149,0.5);
+      --glow2: rgba(76,149,149,0.15);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      background: var(--bg);
+      color: #e2eded;
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    canvas#bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 48px;
+    }
+
+    /* ── Label ── */
+    .label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.45em;
+      text-transform: uppercase;
+      color: var(--c);
+      opacity: 0.7;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .label::before, .label::after {
+      content: '';
+      width: 32px; height: 1px;
+      background: linear-gradient(to right, transparent, var(--c));
+    }
+    .label::after { background: linear-gradient(to left, transparent, var(--c)); }
+
+    /* ── Clock face ── */
+    .clock {
+      position: relative;
+      width: 320px; height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    svg.rings {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+    }
+
+    .ring-bg { fill:none; stroke: rgba(76,149,149,0.08); stroke-width:1.5; }
+    .ring-outer {
+      fill:none;
+      stroke: var(--c3);
+      stroke-width: 1;
+      stroke-dasharray: 4 8;
+      animation: spinSlow 30s linear infinite;
+      transform-origin: center;
+    }
+    .ring-mid {
+      fill:none;
+      stroke: url(#g1);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 879;
+      stroke-dashoffset: 879;
+      transform: rotate(-90deg);
+      transform-origin: center;
+      filter: drop-shadow(0 0 6px var(--c));
+      transition: stroke-dashoffset 0.08s linear;
+    }
+    .ring-tick {
+      fill: none;
+      stroke: rgba(76,149,149,0.25);
+      stroke-width: 1.5;
+    }
+
+    @keyframes spinSlow { to { transform: rotate(360deg); } }
+
+    .time-center {
+      text-align: center;
+      user-select: none;
+    }
+    .time-hms {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 4rem;
+      font-weight: 200;
+      letter-spacing: -0.04em;
+      color: #fff;
+      line-height: 1;
+      text-shadow: 0 0 40px var(--glow);
+      transition: color 0.4s;
+    }
+    .time-hms.active { color: var(--c2); }
+    .time-cs {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      font-weight: 200;
+      color: var(--c);
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+      text-shadow: 0 0 20px var(--glow2);
+    }
+
+    /* dot indicators */
+    .dots {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .dot-pip {
+      position: absolute;
+      width: 4px; height: 4px;
+      background: var(--c);
+      border-radius: 50%;
+      top: 50%; left: 50%;
+      box-shadow: 0 0 8px var(--c);
+      opacity: 0.3;
+      transition: opacity 0.3s;
+    }
+
+    /* ── Buttons ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: none;
+      outline: none;
+      border-radius: 50%;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.2s;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+    }
+    .btn:hover::after { opacity: 1; }
+    .btn:active { transform: scale(0.94); }
+
+    .btn-sm {
+      width: 68px; height: 68px;
+      background: rgba(76,149,149,0.08);
+      border: 1px solid rgba(76,149,149,0.2);
+      color: var(--c2);
+    }
+    .btn-sm:hover { border-color: var(--c); color: #fff; background: rgba(76,149,149,0.15); }
+    .btn-sm:disabled { opacity: 0.2; cursor: not-allowed; }
+    .btn-sm:disabled:hover::after { opacity: 0; }
+
+    .btn-main {
+      width: 96px; height: 96px;
+      background: var(--c);
+      color: #050a0a;
+      font-size: 0.75rem;
+      font-weight: 700;
+      box-shadow: 0 0 32px var(--glow), 0 0 64px var(--glow2), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .btn-main:hover { background: var(--c2); box-shadow: 0 0 48px var(--glow), 0 0 80px var(--glow2); }
+    .btn-main.stop {
+      background: transparent;
+      color: var(--c);
+      border: 2px solid var(--c);
+      box-shadow: 0 0 24px var(--glow2), inset 0 0 24px rgba(76,149,149,0.05);
+    }
+    .btn-main.stop:hover { background: rgba(76,149,149,0.1); }
+
+    /* ── Laps ── */
+    .laps-wrap {
+      width: 360px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .laps-wrap::-webkit-scrollbar { width: 2px; }
+    .laps-wrap::-webkit-scrollbar-thumb { background: var(--c3); border-radius: 2px; }
+    .laps-wrap:empty { display: none; }
+
+    .lap-row {
+      display: grid;
+      grid-template-columns: 36px 1fr 1fr;
+      align-items: center;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: rgba(76,149,149,0.04);
+      border: 1px solid rgba(76,149,149,0.08);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      font-weight: 300;
+      animation: slideIn 0.2s cubic-bezier(0.16,1,0.3,1);
+    }
+    @keyframes slideIn {
+      from { opacity:0; transform: translateY(-8px) scale(0.98); }
+      to   { opacity:1; transform: translateY(0) scale(1); }
+    }
+    .lap-row:hover { background: rgba(76,149,149,0.08); }
+    .lap-n { color: rgba(76,149,149,0.4); font-size: 0.65rem; }
+    .lap-split { color: var(--c2); }
+    .lap-total { text-align: right; color: rgba(255,255,255,0.5); }
+    .lap-row.best  { border-color: rgba(76,149,149,0.3); background: rgba(76,149,149,0.08); }
+    .lap-row.best .lap-split { color: #fff; text-shadow: 0 0 12px var(--c); }
+    .lap-row.worst { border-color: rgba(248,113,113,0.2); }
+    .lap-row.worst .lap-split { color: #f87171; }
+  </style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div class="wrap">
+  <div class="label">Stopwatch</div>
+
+  <div class="clock">
+    <svg class="rings" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#4c9595" stop-opacity="0.3"/>
+          <stop offset="60%" stop-color="#4c9595"/>
+          <stop offset="100%" stop-color="#7bbcbc"/>
+        </linearGradient>
+      </defs>
+      <!-- outer decorative dashes -->
+      <circle class="ring-outer" cx="160" cy="160" r="152"/>
+      <!-- bg track -->
+      <circle class="ring-bg" cx="160" cy="160" r="140"/>
+      <!-- progress ring -->
+      <circle class="ring-mid" id="ringMid" cx="160" cy="160" r="140"/>
+      <!-- tick marks -->
+      <g id="ticks"></g>
+    </svg>
+
+    <div class="time-center">
+      <div class="time-hms" id="hms">00:00</div>
+      <div class="time-cs">.<span id="cs">00</span></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-sm" id="btnLap" disabled>Lap</button>
+    <button class="btn btn-main" id="btnStart">Start</button>
+    <button class="btn btn-sm" id="btnReset">Reset</button>
+  </div>
+
+  <div class="laps-wrap" id="lapsWrap"></div>
+</div>
+
+<script>
+  // ── tick marks ──
+  const ticksG = document.getElementById('ticks');
+  for (let i = 0; i < 60; i++) {
+    const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
+    const isMaj = i % 5 === 0;
+    const r0 = isMaj ? 130 : 133;
+    const r1 = isMaj ? 140 : 138;
+    const x0 = 160 + r0 * Math.cos(angle);
+    const y0 = 160 + r0 * Math.sin(angle);
+    const x1 = 160 + r1 * Math.cos(angle);
+    const y1 = 160 + r1 * Math.sin(angle);
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', x0); line.setAttribute('y1', y0);
+    line.setAttribute('x2', x1); line.setAttribute('y2', y1);
+    line.setAttribute('stroke', isMaj ? 'rgba(76,149,149,0.5)' : 'rgba(76,149,149,0.18)');
+    line.setAttribute('stroke-width', isMaj ? '1.5' : '1');
+    ticksG.appendChild(line);
+  }
+
+  // ── canvas background ──
+  const canvas = document.getElementById('bg');
+  const ctx = canvas.getContext('2d');
+  const particles = [];
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  for (let i = 0; i < 60; i++) {
+    particles.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      r: Math.random() * 1.5 + 0.3,
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: (Math.random() - 0.5) * 0.2,
+      o: Math.random() * 0.4 + 0.1
+    });
+  }
+  function drawBg() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // radial glow
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(cx, cy));
+    gr.addColorStop(0, 'rgba(76,149,149,0.06)');
+    gr.addColorStop(1, 'transparent');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // particles
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = canvas.width;
+      if (p.x > canvas.width) p.x = 0;
+      if (p.y < 0) p.y = canvas.height;
+      if (p.y > canvas.height) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(76,149,149,${p.o})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(drawBg);
+  }
+  drawBg();
+
+  // ── stopwatch logic ──
+  let startTime = 0, elapsed = 0, raf = null, running = false;
+  let lapTimes = [], lastLap = 0;
+
+  const hmsEl    = document.getElementById('hms');
+  const csEl     = document.getElementById('cs');
+  const ring     = document.getElementById('ringMid');
+  const lapsWrap = document.getElementById('lapsWrap');
+  const btnStart = document.getElementById('btnStart');
+  const btnLap   = document.getElementById('btnLap');
+  const btnReset = document.getElementById('btnReset');
+
+  const CIRC   = 2 * Math.PI * 140;
+  const CYCLE  = 60000;
+  const pad    = n => String(n).padStart(2,'0');
+
+  function fmt(ms) {
+    const t    = Math.floor(ms / 10);
+    const cs   = t % 100;
+    const s    = Math.floor(t / 100) % 60;
+    const m    = Math.floor(t / 6000) % 60;
+    const h    = Math.floor(t / 360000);
+    const hms  = h ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    return { hms, cs: pad(cs) };
+  }
+
+  function tick() {
+    elapsed = performance.now() - startTime;
+    const { hms, cs } = fmt(elapsed);
+    hmsEl.textContent = hms;
+    csEl.textContent  = cs;
+    const pct = (elapsed % CYCLE) / CYCLE;
+    ring.style.strokeDashoffset = CIRC * (1 - pct);
+    raf = requestAnimationFrame(tick);
+  }
+
+  function colorLaps() {
+    const rows = [...lapsWrap.querySelectorAll('.lap-row')];
+    if (lapTimes.length < 2) return;
+    let minI = 0, maxI = 0;
+    lapTimes.forEach((v,i) => { if(v<lapTimes[minI])minI=i; if(v>lapTimes[maxI])maxI=i; });
+    const rev = lapTimes.length - 1;
+    rows.forEach(r => r.classList.remove('best','worst'));
+    rows[rev-minI]?.classList.add('best');
+    rows[rev-maxI]?.classList.add('worst');
+  }
+
+  btnStart.addEventListener('click', () => {
+    if (!running) {
+      startTime = performance.now() - elapsed;
+      running = true;
+      btnStart.textContent = 'Stop';
+      btnStart.classList.add('stop');
+      btnLap.disabled = false;
+      hmsEl.classList.add('active');
+      raf = requestAnimationFrame(tick);
+    } else {
+      cancelAnimationFrame(raf);
+      running = false;
+      btnStart.textContent = 'Start';
+      btnStart.classList.remove('stop');
+      btnLap.disabled = true;
+      hmsEl.classList.remove('active');
+    }
+  });
+
+  btnLap.addEventListener('click', () => {
+    if (!running) return;
+    const split = elapsed - lastLap;
+    lapTimes.push(split);
+    lastLap = elapsed;
+    const { hms: th, cs: tc } = fmt(elapsed);
+    const { hms: sh, cs: sc } = fmt(split);
+    const row = document.createElement('div');
+    row.className = 'lap-row';
+    row.innerHTML = `
+      <span class="lap-n">${lapTimes.length}</span>
+      <span class="lap-split">${sh}.${sc}</span>
+      <span class="lap-total">${th}.${tc}</span>`;
+    lapsWrap.prepend(row);
+    colorLaps();
+  });
+
+  btnReset.addEventListener('click', () => {
+    cancelAnimationFrame(raf);
+    running = false; elapsed = 0; lapTimes = []; lastLap = 0;
+    hmsEl.textContent = '00:00'; csEl.textContent = '00';
+    hmsEl.classList.remove('active');
+    btnStart.textContent = 'Start';
+    btnStart.classList.remove('stop');
+    btnLap.disabled = true;
+    ring.style.strokeDashoffset = CIRC;
+    lapsWrap.innerHTML = '';
+  });
+</script>
+</body>
+</html>
