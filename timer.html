@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>タイマー</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1e1e2e;
+      color: white;
+      font-family: 'Helvetica Neue', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      text-align: center;
+      width: 360px;
+    }
+
+    h1 {
+      font-size: 18px;
+      color: #a6adc8;
+      margin-bottom: 28px;
+      letter-spacing: 0.1em;
+    }
+
+    .inputs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .input-group label {
+      font-size: 12px;
+      color: #a6adc8;
+    }
+
+    .input-group input {
+      width: 72px;
+      padding: 10px 0;
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      background: #313244;
+      color: white;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-group input:focus {
+      border-color: #89b4fa;
+    }
+
+    .display {
+      font-size: 72px;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      margin-bottom: 20px;
+      transition: color 0.3s;
+    }
+
+    .progress-wrap {
+      background: #313244;
+      border-radius: 999px;
+      height: 10px;
+      margin: 0 auto 32px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      border-radius: 999px;
+      width: 100%;
+      background: #89b4fa;
+      transition: width 0.9s linear, background 0.5s;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    button {
+      padding: 12px 28px;
+      font-size: 15px;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.96); }
+    button:hover { opacity: 0.85; }
+
+    #startBtn { background: #89b4fa; color: #1e1e2e; }
+    #resetBtn { background: #45475a; color: white; }
+
+    .message {
+      font-size: 16px;
+      color: #a6e3a1;
+      min-height: 24px;
+      transition: opacity 0.3s;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>⏱ タイマー</h1>
+
+  <div class="inputs">
+    <div class="input-group">
+      <input type="number" id="inputH" min="0" max="99" value="0">
+      <label>時間</label>
+    </div>
+    <div class="input-group">
+      <input type="number" id="inputM" min="0" max="59" value="0">
+      <label>分</label>
+    </div>
+    <div class="input-group">
+      <input type="number" id="inputS" min="0" max="59" value="0">
+      <label>秒</label>
+    </div>
+  </div>
+
+  <div class="display" id="display">00:00</div>
+
+  <div class="progress-wrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="buttons">
+    <button id="startBtn" onclick="toggle()">▶ スタート</button>
+    <button id="resetBtn" onclick="reset()">↺ リセット</button>
+  </div>
+
+  <div class="message" id="message"></div>
+</div>
+
+<script>
+  let total = 0, remaining = 0, running = false, interval = null;
+
+  const display = document.getElementById('display');
+  const bar = document.getElementById('progressBar');
+  const startBtn = document.getElementById('startBtn');
+  const message = document.getElementById('message');
+
+  function format(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = n => String(n).padStart(2, '0');
+    return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+  }
+
+  function getInput() {
+    const h = parseInt(document.getElementById('inputH').value) || 0;
+    const m = parseInt(document.getElementById('inputM').value) || 0;
+    const s = parseInt(document.getElementById('inputS').value) || 0;
+    return h * 3600 + m * 60 + s;
+  }
+
+  function updateDisplay() {
+    display.textContent = format(remaining);
+    const ratio = total > 0 ? remaining / total : 0;
+    bar.style.width = (ratio * 100) + '%';
+    bar.style.background = ratio > 0.3 ? '#89b4fa' : ratio > 0.1 ? '#fab387' : '#f38ba8';
+  }
+
+  function toggle() {
+    if (running) {
+      pause();
+    } else {
+      start();
+    }
+  }
+
+  function start() {
+    if (remaining === 0) {
+      total = getInput();
+      remaining = total;
+    }
+    if (remaining <= 0) return;
+    message.textContent = '';
+    display.style.color = 'white';
+    running = true;
+    startBtn.textContent = '⏸ 一時停止';
+    startBtn.style.background = '#f38ba8';
+    interval = setInterval(() => {
+      remaining--;
+      updateDisplay();
+      if (remaining <= 0) {
+        clearInterval(interval);
+        running = false;
+        startBtn.textContent = '▶ スタート';
+        startBtn.style.background = '#89b4fa';
+        finish();
+      }
+    }, 1000);
+  }
+
+  function pause() {
+    clearInterval(interval);
+    running = false;
+    startBtn.textContent = '▶ 再開';
+    startBtn.style.background = '#89b4fa';
+  }
+
+  function reset() {
+    clearInterval(interval);
+    running = false;
+    remaining = 0;
+    total = 0;
+    display.textContent = '00:00';
+    display.style.color = 'white';
+    bar.style.width = '100%';
+    bar.style.background = '#89b4fa';
+    startBtn.textContent = '▶ スタート';
+    startBtn.style.background = '#89b4fa';
+    message.textContent = '';
+  }
+
+  function finish() {
+    message.textContent = '⏰ 時間になりました！';
+    let count = 0;
+    const flash = setInterval(() => {
+      display.style.color = count % 2 === 0 ? '#a6e3a1' : '#1e1e2e';
+      count++;
+      if (count >= 8) { clearInterval(flash); display.style.color = 'white'; }
+    }, 300);
+    if (Notification.permission === 'granted') {
+      new Notification('⏰ タイマー終了', { body: '時間になりました！' });
+    }
+  }
+
+  // 通知の許可を取得
+  if ('Notification' in window) Notification.requestPermission();
+</script>
+</body>
+</html>

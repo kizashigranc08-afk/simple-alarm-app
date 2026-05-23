@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タスク管理</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f9f9f9;
+    --surface: #ffffff;
+    --border: #e5e5e5;
+    --text: #1a1a1a;
+    --text-muted: #888;
+    --accent: #4f6ef7;
+    --accent-hover: #3a57d6;
+    --danger: #e55;
+    --danger-hover: #c33;
+    --done-bg: #f0f0f0;
+    --done-text: #aaa;
+    --radius: 8px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.07);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.3px; }
+
+  .app { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 52px); }
+
+  /* Sidebar */
+  aside {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar-section { padding: 16px; }
+  .sidebar-section + .sidebar-section { border-top: 1px solid var(--border); }
+
+  .sidebar-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sidebar-label button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+
+  .filter-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: background 0.1s, color 0.1s;
+    gap: 6px;
+  }
+
+  .filter-item:hover { background: var(--bg); color: var(--text); }
+  .filter-item.active { background: var(--accent); color: #fff; }
+  .filter-item .count {
+    font-size: 11px;
+    background: rgba(0,0,0,0.08);
+    border-radius: 10px;
+    padding: 1px 7px;
+    min-width: 22px;
+    text-align: center;
+  }
+  .filter-item.active .count { background: rgba(255,255,255,0.25); }
+
+  .chip-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .chip-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .chip-row:hover { background: var(--bg); }
+  .chip-row.active { background: var(--accent); color: #fff; }
+
+  .chip-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  .chip-name { flex: 1; font-size: 13px; }
+
+  .chip-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--danger); font-size: 14px; line-height: 1;
+    opacity: 0; transition: opacity 0.1s; padding: 0 2px;
+  }
+  .chip-row:hover .chip-del { opacity: 1; }
+  .chip-row.active .chip-del { color: rgba(255,255,255,0.7); opacity: 1; }
+
+  .inline-add {
+    display: flex; gap: 4px; margin-top: 8px;
+  }
+  .inline-add input {
+    flex: 1; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 4px 8px; font-size: 13px; background: var(--bg);
+    outline: none; color: var(--text);
+  }
+  .inline-add input:focus { border-color: var(--accent); }
+  .inline-add button {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: var(--radius); padding: 4px 10px; cursor: pointer; font-size: 13px;
+  }
+  .inline-add button:hover { background: var(--accent-hover); }
+
+  /* Main */
+  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .toolbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .search-box {
+    flex: 1; max-width: 320px;
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 6px 10px; background: var(--bg);
+  }
+  .search-box input {
+    border: none; background: none; outline: none;
+    font-size: 13px; width: 100%; color: var(--text);
+  }
+  .search-box span { color: var(--text-muted); font-size: 14px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 14px; border-radius: var(--radius); cursor: pointer;
+    font-size: 13px; font-weight: 500; border: none; transition: background 0.1s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .task-list-wrap { flex: 1; overflow-y: auto; padding: 20px; }
+
+  .empty {
+    text-align: center; padding: 60px 20px; color: var(--text-muted);
+  }
+  .empty p { font-size: 15px; margin-top: 8px; }
+
+  /* Task cards */
+  .task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    transition: box-shadow 0.1s;
+    box-shadow: var(--shadow);
+  }
+  .task-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .task-card.done { background: var(--done-bg); border-color: transparent; box-shadow: none; }
+
+  .task-check {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--border); cursor: pointer;
+    flex-shrink: 0; margin-top: 2px;
+    appearance: none; -webkit-appearance: none;
+    background: var(--surface); transition: background 0.15s, border-color 0.15s;
+    position: relative;
+  }
+  .task-check:checked {
+    background: var(--accent); border-color: var(--accent);
+  }
+  .task-check:checked::after {
+    content: ''; position: absolute; left: 4px; top: 1px;
+    width: 5px; height: 9px; border: 2px solid #fff;
+    border-left: none; border-top: none; transform: rotate(45deg);
+  }
+
+  .task-body { flex: 1; min-width: 0; }
+
+  .task-title {
+    font-size: 14px; font-weight: 500;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .done .task-title { text-decoration: line-through; color: var(--done-text); }
+
+  .task-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+
+  .tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 20px;
+    display: inline-block; font-weight: 500;
+  }
+  .tag-cat { background: #eef0ff; color: #4f6ef7; }
+  .tag-user {
+    background: #f0f0f0; color: #555;
+  }
+
+  .task-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+  .icon-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 14px;
+    padding: 4px 6px; border-radius: 6px; transition: background 0.1s, color 0.1s;
+  }
+  .icon-btn:hover { background: var(--bg); color: var(--text); }
+  .icon-btn.del:hover { background: #fee; color: var(--danger); }
+
+  /* Modal */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.3); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface); border-radius: 12px;
+    padding: 24px; width: 480px; max-width: 95vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px 10px; font-size: 14px; background: var(--bg);
+    color: var(--text); outline: none; font-family: inherit;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    border-color: var(--accent);
+  }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+
+  .tag-input-wrap {
+    display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 6px 8px; background: var(--bg); cursor: text;
+    min-height: 38px;
+  }
+  .tag-input-wrap:focus-within { border-color: var(--accent); }
+  .tag-input-wrap input {
+    border: none; background: none; outline: none; font-size: 13px;
+    min-width: 80px; flex: 1; padding: 0; color: var(--text);
+  }
+  .tag-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #f0f0f0; border-radius: 20px; padding: 2px 8px; font-size: 12px;
+  }
+  .tag-pill button {
+    background: none; border: none; cursor: pointer; color: #888;
+    font-size: 12px; line-height: 1; padding: 0 1px;
+  }
+  .tag-pill button:hover { color: var(--danger); }
+
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  .btn-ghost {
+    background: none; border: 1px solid var(--border);
+    color: var(--text); padding: 7px 14px; border-radius: var(--radius);
+    cursor: pointer; font-size: 13px; font-weight: 500;
+  }
+  .btn-ghost:hover { background: var(--bg); }
+
+  .color-swatch-list { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .color-swatch {
+    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.1s;
+  }
+  .color-swatch.selected { border-color: var(--text); transform: scale(1.15); }
+
+  @media (max-width: 600px) {
+    aside { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <rect x="2" y="4" width="16" height="2" rx="1" fill="#4f6ef7"/>
+    <rect x="2" y="9" width="12" height="2" rx="1" fill="#4f6ef7" opacity=".6"/>
+    <rect x="2" y="14" width="9" height="2" rx="1" fill="#4f6ef7" opacity=".3"/>
+  </svg>
+  <h1>タスク管理</h1>
+</header>
+
+<div class="app">
+  <aside>
+    <div class="sidebar-section">
+      <div class="sidebar-label">ビュー</div>
+      <div class="chip-list" id="viewFilters">
+        <div class="filter-item active" data-view="all">
+          <span>すべて</span>
+          <span class="count" id="count-all">0</span>
+        </div>
+        <div class="filter-item" data-view="active">
+          <span>未完了</span>
+          <span class="count" id="count-active">0</span>
+        </div>
+        <div class="filter-item" data-view="done">
+          <span>完了済み</span>
+          <span class="count" id="count-done">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">
+        <span>カテゴリ</span>
+        <button id="addCatBtn" title="カテゴリを追加">+</button>
+      </div>
+      <div class="chip-list" id="catList"></div>
+      <div class="inline-add" id="catAddForm" style="display:none">
+        <input id="catNameInput" placeholder="名前" maxlength="20">
+        <button id="catSaveBtn">追加</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">
+        <span>タグ</span>
+      </div>
+      <div class="chip-list" id="tagList"></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input id="searchInput" placeholder="タスクを検索..." type="search">
+      </div>
+      <button class="btn btn-primary" id="addTaskBtn">+ タスク追加</button>
+    </div>
+    <div class="task-list-wrap">
+      <div id="taskList"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Task Modal -->
+<div class="overlay" id="taskModal">
+  <div class="modal">
+    <h2 id="modalTitle">タスクを追加</h2>
+    <div class="form-group">
+      <label>タイトル</label>
+      <input id="taskTitleInput" placeholder="タスクのタイトル" maxlength="100">
+    </div>
+    <div class="form-group">
+      <label>メモ</label>
+      <textarea id="taskNoteInput" placeholder="メモ（任意）"></textarea>
+    </div>
+    <div class="form-group">
+      <label>カテゴリ</label>
+      <select id="taskCatSelect"></select>
+    </div>
+    <div class="form-group">
+      <label>タグ（Enterで追加）</label>
+      <div class="tag-input-wrap" id="tagInputWrap">
+        <input id="tagInput" placeholder="タグを入力...">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modalCancel">キャンセル</button>
+      <button class="btn btn-primary" id="modalSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category Color Modal -->
+<div class="overlay" id="catModal">
+  <div class="modal" style="width:300px">
+    <h2>カテゴリを追加</h2>
+    <div class="form-group">
+      <label>名前</label>
+      <input id="catModalName" placeholder="カテゴリ名" maxlength="20">
+    </div>
+    <div class="form-group">
+      <label>色</label>
+      <div class="color-swatch-list" id="colorSwatches"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="catModalCancel">キャンセル</button>
+      <button class="btn btn-primary" id="catModalSave">追加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CAT_COLORS = ['#4f6ef7','#e67e22','#27ae60','#e74c3c','#9b59b6','#1abc9c','#f39c12','#2980b9','#c0392b','#8e44ad'];
+
+let state = {
+  tasks: [],
+  categories: [],
+  view: 'all',
+  filterCat: null,
+  filterTag: null,
+  search: '',
+};
+
+let editingTaskId = null;
+let modalTags = [];
+let selectedColor = CAT_COLORS[0];
+
+function save() {
+  localStorage.setItem('tm_tasks', JSON.stringify(state.tasks));
+  localStorage.setItem('tm_categories', JSON.stringify(state.categories));
+}
+
+function load() {
+  try {
+    state.tasks = JSON.parse(localStorage.getItem('tm_tasks') || '[]');
+    state.categories = JSON.parse(localStorage.getItem('tm_categories') || '[]');
+  } catch(e) {}
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+// ---- Render ----
+
+function renderAll() {
+  renderCounts();
+  renderCatSidebar();
+  renderTagSidebar();
+  renderTasks();
+}
+
+function renderCounts() {
+  const all = state.tasks.length;
+  const done = state.tasks.filter(t => t.done).length;
+  document.getElementById('count-all').textContent = all;
+  document.getElementById('count-active').textContent = all - done;
+  document.getElementById('count-done').textContent = done;
+}
+
+function renderCatSidebar() {
+  const list = document.getElementById('catList');
+  list.innerHTML = '';
+
+  // "すべて" option
+  const allRow = makeChipRow(null, '（すべてのカテゴリ）', '#ccc', state.filterCat === null && state.filterTag === null);
+  list.appendChild(allRow);
+
+  state.categories.forEach(cat => {
+    const row = makeChipRow(cat.id, cat.name, cat.color, state.filterCat === cat.id);
+    list.appendChild(row);
+  });
+}
+
+function makeChipRow(catId, name, color, active) {
+  const row = document.createElement('div');
+  row.className = 'chip-row' + (active ? ' active' : '');
+  row.innerHTML = `
+    <div class="chip-dot" style="background:${color}"></div>
+    <span class="chip-name">${escHtml(name)}</span>
+    ${catId ? `<button class="chip-del" data-id="${catId}" title="削除">×</button>` : ''}
+  `;
+  row.addEventListener('click', e => {
+    if (e.target.classList.contains('chip-del')) return;
+    state.filterCat = catId;
+    state.filterTag = null;
+    renderAll();
+  });
+  const del = row.querySelector('.chip-del');
+  if (del) {
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      if (confirm(`カテゴリ「${name}」を削除しますか？\n（タスクのカテゴリ設定は解除されます）`)) {
+        state.categories = state.categories.filter(c => c.id !== catId);
+        state.tasks = state.tasks.map(t => t.catId === catId ? {...t, catId: null} : t);
+        if (state.filterCat === catId) state.filterCat = null;
+        save(); renderAll();
+      }
+    });
+  }
+  return row;
+}
+
+function getAllTags() {
+  const set = new Set();
+  state.tasks.forEach(t => (t.tags || []).forEach(tag => set.add(tag)));
+  return [...set].sort();
+}
+
+function renderTagSidebar() {
+  const list = document.getElementById('tagList');
+  list.innerHTML = '';
+  getAllTags().forEach(tag => {
+    const row = document.createElement('div');
+    row.className = 'chip-row' + (state.filterTag === tag ? ' active' : '');
+    row.innerHTML = `<span class="chip-name" style="font-size:12px">#${escHtml(tag)}</span>`;
+    row.addEventListener('click', () => {
+      state.filterTag = state.filterTag === tag ? null : tag;
+      state.filterCat = null;
+      renderAll();
+    });
+    list.appendChild(row);
+  });
+}
+
+function getFilteredTasks() {
+  return state.tasks.filter(t => {
+    if (state.view === 'active' && t.done) return false;
+    if (state.view === 'done' && !t.done) return false;
+    if (state.filterCat !== null && t.catId !== state.filterCat) return false;
+    if (state.filterTag !== null && !(t.tags || []).includes(state.filterTag)) return false;
+    if (state.search) {
+      const q = state.search.toLowerCase();
+      if (!t.title.toLowerCase().includes(q) && !(t.note || '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderTasks() {
+  const list = document.getElementById('taskList');
+  const tasks = getFilteredTasks();
+  if (tasks.length === 0) {
+    list.innerHTML = `<div class="empty"><div style="font-size:36px">📋</div><p>タスクがありません</p></div>`;
+    return;
+  }
+  list.innerHTML = '';
+  tasks.forEach(task => {
+    const cat = state.categories.find(c => c.id === task.catId);
+    const card = document.createElement('div');
+    card.className = 'task-card' + (task.done ? ' done' : '');
+
+    const tags = (task.tags || []).map(tag =>
+      `<span class="tag tag-user" style="cursor:pointer" data-tag="${escHtml(tag)}">#${escHtml(tag)}</span>`
+    ).join('');
+    const catChip = cat ? `<span class="tag tag-cat" style="background:${cat.color}20;color:${cat.color}">${escHtml(cat.name)}</span>` : '';
+
+    card.innerHTML = `
+      <input type="checkbox" class="task-check" ${task.done ? 'checked' : ''} data-id="${task.id}">
+      <div class="task-body">
+        <div class="task-title">${escHtml(task.title)}</div>
+        ${task.note ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${escHtml(task.note)}</div>` : ''}
+        <div class="task-meta">${catChip}${tags}</div>
+      </div>
+      <div class="task-actions">
+        <button class="icon-btn" data-edit="${task.id}" title="編集">✏️</button>
+        <button class="icon-btn del" data-del="${task.id}" title="削除">🗑️</button>
+      </div>
+    `;
+
+    card.querySelector('.task-check').addEventListener('change', e => {
+      const id = e.target.dataset.id;
+      const t = state.tasks.find(x => x.id === id);
+      if (t) { t.done = e.target.checked; save(); renderAll(); }
+    });
+
+    card.querySelector('[data-edit]').addEventListener('click', () => openEditModal(task.id));
+    card.querySelector('[data-del]').addEventListener('click', () => {
+      if (confirm(`「${task.title}」を削除しますか？`)) {
+        state.tasks = state.tasks.filter(x => x.id !== task.id);
+        save(); renderAll();
+      }
+    });
+
+    card.querySelectorAll('[data-tag]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.filterTag = el.dataset.tag;
+        state.filterCat = null;
+        renderAll();
+      });
+    });
+
+    list.appendChild(card);
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ---- Task Modal ----
+
+function openAddModal() {
+  editingTaskId = null;
+  modalTags = [];
+  document.getElementById('modalTitle').textContent = 'タスクを追加';
+  document.getElementById('taskTitleInput').value = '';
+  document.getElementById('taskNoteInput').value = '';
+  refreshCatSelect(null);
+  refreshModalTags();
+  document.getElementById('taskModal').classList.add('open');
+  document.getElementById('taskTitleInput').focus();
+}
+
+function openEditModal(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task) return;
+  editingTaskId = id;
+  modalTags = [...(task.tags || [])];
+  document.getElementById('modalTitle').textContent = 'タスクを編集';
+  document.getElementById('taskTitleInput').value = task.title;
+  document.getElementById('taskNoteInput').value = task.note || '';
+  refreshCatSelect(task.catId);
+  refreshModalTags();
+  document.getElementById('taskModal').classList.add('open');
+  document.getElementById('taskTitleInput').focus();
+}
+
+function refreshCatSelect(selectedId) {
+  const sel = document.getElementById('taskCatSelect');
+  sel.innerHTML = '<option value="">（カテゴリなし）</option>';
+  state.categories.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.name;
+    if (cat.id === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function refreshModalTags() {
+  const wrap = document.getElementById('tagInputWrap');
+  const input = document.getElementById('tagInput');
+  wrap.querySelectorAll('.tag-pill').forEach(el => el.remove());
+  modalTags.forEach(tag => {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.innerHTML = `${escHtml(tag)} <button data-tag="${escHtml(tag)}">×</button>`;
+    pill.querySelector('button').addEventListener('click', () => {
+      modalTags = modalTags.filter(t => t !== tag);
+      refreshModalTags();
+    });
+    wrap.insertBefore(pill, input);
+  });
+}
+
+function saveTask() {
+  const title = document.getElementById('taskTitleInput').value.trim();
+  if (!title) { document.getElementById('taskTitleInput').focus(); return; }
+  const note = document.getElementById('taskNoteInput').value.trim();
+  const catId = document.getElementById('taskCatSelect').value || null;
+
+  if (editingTaskId) {
+    const t = state.tasks.find(x => x.id === editingTaskId);
+    if (t) { t.title = title; t.note = note; t.catId = catId; t.tags = [...modalTags]; }
+  } else {
+    state.tasks.unshift({ id: uid(), title, note, catId, tags: [...modalTags], done: false, created: Date.now() });
+  }
+
+  save(); renderAll();
+  document.getElementById('taskModal').classList.remove('open');
+}
+
+// ---- Category Modal ----
+
+function renderColorSwatches() {
+  const wrap = document.getElementById('colorSwatches');
+  wrap.innerHTML = '';
+  CAT_COLORS.forEach(c => {
+    const s = document.createElement('div');
+    s.className = 'color-swatch' + (c === selectedColor ? ' selected' : '');
+    s.style.background = c;
+    s.addEventListener('click', () => {
+      selectedColor = c;
+      renderColorSwatches();
+    });
+    wrap.appendChild(s);
+  });
+}
+
+function openCatModal() {
+  document.getElementById('catModalName').value = '';
+  selectedColor = CAT_COLORS[0];
+  renderColorSwatches();
+  document.getElementById('catModal').classList.add('open');
+  document.getElementById('catModalName').focus();
+}
+
+function saveCat() {
+  const name = document.getElementById('catModalName').value.trim();
+  if (!name) { document.getElementById('catModalName').focus(); return; }
+  state.categories.push({ id: uid(), name, color: selectedColor });
+  save(); renderAll();
+  document.getElementById('catModal').classList.remove('open');
+}
+
+// ---- View filter ----
+
+document.getElementById('viewFilters').addEventListener('click', e => {
+  const item = e.target.closest('[data-view]');
+  if (!item) return;
+  state.view = item.dataset.view;
+  document.querySelectorAll('[data-view]').forEach(el => el.classList.toggle('active', el.dataset.view === state.view));
+  renderAll();
+});
+
+// ---- Search ----
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  state.search = e.target.value;
+  renderAll();
+});
+
+// ---- Task modal events ----
+
+document.getElementById('addTaskBtn').addEventListener('click', openAddModal);
+document.getElementById('modalCancel').addEventListener('click', () => document.getElementById('taskModal').classList.remove('open'));
+document.getElementById('modalSave').addEventListener('click', saveTask);
+
+document.getElementById('taskModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('taskModal')) document.getElementById('taskModal').classList.remove('open');
+});
+
+document.getElementById('taskTitleInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveTask();
+  if (e.key === 'Escape') document.getElementById('taskModal').classList.remove('open');
+});
+
+document.getElementById('tagInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = e.target.value.trim().replace(/,/g, '');
+    if (val && !modalTags.includes(val)) { modalTags.push(val); refreshModalTags(); }
+    e.target.value = '';
+  }
+  if (e.key === 'Backspace' && !e.target.value && modalTags.length) {
+    modalTags.pop(); refreshModalTags();
+  }
+});
+
+// ---- Category sidebar events ----
+
+document.getElementById('addCatBtn').addEventListener('click', () => {
+  openCatModal();
+});
+
+document.getElementById('catModalCancel').addEventListener('click', () => document.getElementById('catModal').classList.remove('open'));
+document.getElementById('catModalSave').addEventListener('click', saveCat);
+document.getElementById('catModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('catModal')) document.getElementById('catModal').classList.remove('open');
+});
+document.getElementById('catModalName').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveCat();
+  if (e.key === 'Escape') document.getElementById('catModal').classList.remove('open');
+});
+
+// ---- Init ----
+
+load();
+renderAll();
+</script>
+</body>
+</html>
