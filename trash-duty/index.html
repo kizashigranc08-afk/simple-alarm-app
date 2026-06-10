@@ -426,6 +426,45 @@ header {
 @media (min-width: 540px) {
   #current-name { font-size: 4.4rem; }
 }
+
+/* 折りたたみセクション */
+.collapse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.collapse-header .card-title { margin-bottom: 0; }
+.collapse-arrow {
+  font-size: .85rem;
+  color: var(--sub);
+  transition: transform .2s;
+}
+.collapse-arrow.open { transform: rotate(180deg); }
+.collapse-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .3s ease, margin-top .3s;
+  margin-top: 0;
+}
+.collapse-body.open {
+  max-height: 600px;
+  margin-top: 14px;
+}
+
+/* タブの非表示ボタン */
+.tab-hide {
+  display: block;
+  margin: 4px auto 0;
+  font-size: .62rem;
+  color: rgba(255,255,255,.55);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.tab.on .tab-hide { color: rgba(29,78,216,.5); }
 </style>
 </head>
 <body>
@@ -460,28 +499,36 @@ header {
     <button class="btn btn-gray"   id="btn-undo" onclick="undo()"          disabled>↩️ 1つ前に戻す</button>
   </div>
 
-  <!-- メンバー追加 -->
+  <!-- メンバー管理（折りたたみ） -->
   <div class="card">
-    <div class="card-title">👥 メンバー</div>
-    <div class="add-row">
-      <input type="text" id="name-input" placeholder="名前を入力してEnter"
-             maxlength="20" autocomplete="off"
-             onkeyup="if(event.key==='Enter'){addMember();event.preventDefault();}">
-      <button class="add-btn" onclick="addMember()">追加</button>
+    <div class="collapse-header" onclick="toggleCollapse('member-body','member-arrow')">
+      <div class="card-title">👥 メンバー管理</div>
+      <span class="collapse-arrow" id="member-arrow">▼</span>
     </div>
-    <ul class="member-list" id="member-list">
-      <li class="no-data">メンバーがいません</li>
-    </ul>
+    <div class="collapse-body" id="member-body">
+      <div class="add-row">
+        <input type="text" id="name-input" placeholder="名前を入力してEnter"
+               maxlength="20" autocomplete="off"
+               onkeyup="if(event.key==='Enter'){addMember();event.preventDefault();}">
+        <button class="add-btn" onclick="addMember()">追加</button>
+      </div>
+      <ul class="member-list" id="member-list">
+        <li class="no-data">メンバーがいません</li>
+      </ul>
+    </div>
   </div>
 
-  <!-- タスク名編集 -->
+  <!-- タスク名編集（折りたたみ） -->
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div class="card-title" style="margin-bottom:0;">⚙️ タスク名編集</div>
-      <button class="save-btn" onclick="saveTaskNames()">💾 保存</button>
+    <div class="collapse-header" onclick="toggleCollapse('task-body','task-arrow')">
+      <div class="card-title">⚙️ タスク名編集</div>
+      <span class="collapse-arrow" id="task-arrow">▼</span>
     </div>
-    <p style="font-size:.78rem;color:var(--sub);margin-bottom:10px;">絵文字と名前を変更すればどんな当番にも使えます</p>
-    <div class="task-edit-grid" id="task-edit-grid"><!-- JS描画 --></div>
+    <div class="collapse-body" id="task-body">
+      <p style="font-size:.78rem;color:var(--sub);margin-bottom:10px;">絵文字と名前を変更すればどんな当番にも使えます</p>
+      <div class="task-edit-grid" id="task-edit-grid"><!-- JS描画 --></div>
+      <button class="save-btn" style="margin-top:10px;width:100%;padding:10px;" onclick="saveTaskNames()">💾 保存</button>
+    </div>
   </div>
 
   <!-- 統計 -->
@@ -550,10 +597,10 @@ function fresh() {
     subtitle: 'ゴミ捨て・掃除・その他の当番管理',
     mode:     'order',
     tasks: [
-      { id:'t1', icon:'🗑️', name:'燃えるゴミ' },
-      { id:'t2', icon:'♻️',  name:'プラスチック' },
-      { id:'t3', icon:'📦', name:'ダンボール' },
-      { id:'t4', icon:'🧴', name:'ペットボトル' },
+      { id:'t1', icon:'🗑️', name:'燃えるゴミ',   hidden:false },
+      { id:'t2', icon:'♻️',  name:'プラスチック', hidden:false },
+      { id:'t3', icon:'📦', name:'ダンボール',   hidden:false },
+      { id:'t4', icon:'🧴', name:'ペットボトル', hidden:false },
     ],
     cur:     't1',      // 現在選択中のタスクID
     members: [],
@@ -578,7 +625,9 @@ function load() {
     if (d.title)    S.title    = d.title;
     if (d.subtitle !== undefined) S.subtitle = d.subtitle;
     if (d.mode)     S.mode     = d.mode;
-    if (Array.isArray(d.tasks) && d.tasks.length === 4) S.tasks = d.tasks;
+    if (Array.isArray(d.tasks) && d.tasks.length === 4) {
+      S.tasks = d.tasks.map(t => ({ hidden:false, ...t })); // hiddenフラグを補完
+    }
     if (d.cur)      S.cur      = d.cur;
     if (Array.isArray(d.members)) {
       // メンバーを安全にマイグレーション
@@ -623,6 +672,34 @@ function setMode(m) {
 function selectTask(id) {
   S.cur = id;
   save(); draw();
+}
+
+/* ---------- タスク非表示切替 ---------- */
+function toggleTaskHidden(id, e) {
+  e.stopPropagation(); // タブ選択をさせない
+  const task = S.tasks.find(t => t.id === id);
+  if (!task) return;
+  // 表示中のタスクが1つしかない場合は非表示にしない
+  const visibleCount = S.tasks.filter(t => !t.hidden).length;
+  if (!task.hidden && visibleCount <= 1) {
+    alert('最低1つは表示が必要です');
+    return;
+  }
+  task.hidden = !task.hidden;
+  // 非表示にしたタスクが現在選択中なら、最初の表示タスクに切替
+  if (task.hidden && S.cur === id) {
+    const first = S.tasks.find(t => !t.hidden);
+    if (first) S.cur = first.id;
+  }
+  save(); draw();
+}
+
+/* ---------- 折りたたみトグル ---------- */
+function toggleCollapse(bodyId, arrowId) {
+  const body  = document.getElementById(bodyId);
+  const arrow = document.getElementById(arrowId);
+  const isOpen = body.classList.toggle('open');
+  arrow.classList.toggle('open', isOpen);
 }
 
 /* ---------- 現在の当番 ---------- */
@@ -785,12 +862,43 @@ function drawTabs() {
   const el = document.getElementById('tabs');
   el.innerHTML = '';
   S.tasks.forEach(t => {
+    if (t.hidden) return; // 非表示タスクはタブに出さない
     const b = document.createElement('button');
     b.className = 'tab' + (t.id === S.cur ? ' on' : '');
-    b.innerHTML = `<span class="tab-icon">${esc(t.icon)}</span>${esc(t.name)}`;
+
+    const icon = document.createElement('span');
+    icon.className   = 'tab-icon';
+    icon.textContent = t.icon;
+
+    const name = document.createTextNode(t.name);
+
+    const hideBtn = document.createElement('button');
+    hideBtn.className   = 'tab-hide';
+    hideBtn.textContent = '非表示にする';
+    hideBtn.onclick = (e) => toggleTaskHidden(t.id, e);
+
+    b.appendChild(icon);
+    b.appendChild(name);
+    b.appendChild(hideBtn);
     b.onclick = () => selectTask(t.id);
     el.appendChild(b);
   });
+
+  // 非表示タスクがある場合、「表示に戻す」ボタンをタブ列末尾に追加
+  const hiddenTasks = S.tasks.filter(t => t.hidden);
+  if (hiddenTasks.length) {
+    const restoreWrap = document.createElement('div');
+    restoreWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;justify-content:center;';
+    hiddenTasks.forEach(t => {
+      const rb = document.createElement('button');
+      rb.style.cssText = 'background:rgba(255,255,255,.1);border:1px dashed rgba(255,255,255,.4);color:rgba(255,255,255,.7);border-radius:8px;padding:4px 10px;font-size:.72rem;cursor:pointer;white-space:nowrap;';
+      rb.textContent = `${t.icon} ${t.name} を表示`;
+      rb.onclick = (e) => toggleTaskHidden(t.id, e);
+      restoreWrap.appendChild(rb);
+    });
+    el.appendChild(restoreWrap);
+  }
+
   // モードボタン
   document.getElementById('m-order').className = 'mode-btn' + (S.mode === 'order' ? ' on' : '');
   document.getElementById('m-fair').className  = 'mode-btn' + (S.mode === 'fair'  ? ' on' : '');
